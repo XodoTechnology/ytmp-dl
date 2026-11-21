@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ytmp-dl</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --border:#30363d; --fg:#e6edf3;
+          --dim:#8b949e; --accent:#58a6ff; --green:#3fb950; --red:#f85149;
+          --yellow:#d29922; --purple:#bc8cff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:14px/1.5 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  header { display:flex; align-items:center; gap:12px; padding:12px 20px;
+           border-bottom:1px solid var(--border); background:var(--panel);
+           position:sticky; top:0; z-index:10; }
+  header h1 { font-size:17px; margin:0; font-weight:600; }
+  header .spacer { flex:1; }
+  .btn { background:#21262d; color:var(--fg); border:1px solid var(--border);
+         border-radius:6px; padding:6px 14px; cursor:pointer; font-size:13px; }
+  .btn:hover { background:#30363d; border-color:var(--dim); }
+  .btn.primary { background:#1f6feb; border-color:#1f6feb; color:#fff; }
+  .btn.primary:hover { background:#388bfd; }
+  .btn:disabled { opacity:.45; cursor:default; }
+  .btn.small { padding:3px 10px; font-size:12px; }
+  main { padding:16px 20px; max-width:1400px; margin:0 auto; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+           gap:10px; margin-bottom:14px; }
+  .card { background:var(--panel); border:1px solid var(--border);
+          border-radius:8px; padding:10px 14px; }
+  .card .num { font-size:22px; font-weight:700; }
+  .card .lbl { font-size:11px; color:var(--dim); text-transform:uppercase;
+               letter-spacing:.05em; }
+  .card.done .num { color:var(--green); } .card.pending .num { color:var(--yellow); }
+  .card.failed .num { color:var(--red); } .card.skipped .num { color:var(--purple); }
+  .progress { height:8px; background:#21262d; border-radius:4px; overflow:hidden;
+              margin:6px 0 14px; }
+  .progress > div { height:100%; background:var(--green); width:0;
+                    transition:width .4s; }
+  .panel { background:var(--panel); border:1px solid var(--border);
+           border-radius:8px; margin-bottom:14px; overflow:hidden; }
+  .panel .phead { display:flex; align-items:center; gap:10px; padding:10px 14px;
+                  border-bottom:1px solid var(--border); }
+  .panel .phead h2 { font-size:14px; margin:0; font-weight:600; }
+  .panel .phead .spacer { flex:1; }
+  .jobline { padding:8px 14px; font-size:12px; color:var(--dim);
+             border-bottom:1px solid var(--border); min-height:32px; }
+  .jobline b { color:var(--accent); }
+  .jobline .err { color:var(--red); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:7px 12px; border-bottom:1px solid #21262d;
+           white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  th { color:var(--dim); font-weight:600; font-size:11px; text-transform:uppercase;
+       letter-spacing:.04em; position:sticky; top:0; background:var(--panel); }
+  tr:hover td { background:#1c2129; }
+  .badge { display:inline-block; padding:1px 8px; border-radius:10px;
+           font-size:11px; font-weight:600; }
+  .b-done { background:rgba(63,185,80,.15); color:var(--green); }
+  .b-pending { background:rgba(210,153,34,.15); color:var(--yellow); }
+  .b-failed { background:rgba(248,81,73,.15); color:var(--red); }
+  .b-skipped { background:rgba(188,140,255,.15); color:var(--purple); }
+  .pbar { height:5px; background:#21262d; border-radius:3px; overflow:hidden;
+          min-width:80px; }
+  .pbar > div { height:100%; background:var(--green); }
+  .filters { display:flex; gap:8px; padding:10px 14px; flex-wrap:wrap;
+             border-bottom:1px solid var(--border); }
+  .filters input, .filters select { background:#0d1117; color:var(--fg);
+    border:1px solid var(--border); border-radius:6px; padding:5px 10px;
+    font-size:13px; }
+  .filters input { min-width:220px; }
+  #log { height:340px; overflow-y:auto; background:#010409; padding:10px 14px;
+         font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+         white-space:pre-wrap; word-break:break-all; }
+  #log .ln-warn { color:var(--yellow); } #log .ln-err { color:var(--red); }
+  #log .ln-dbg { color:#6e7681; }
+  .tabs { display:flex; gap:4px; padding:0 20px; }
+  .tab { padding:8px 16px; cursor:pointer; color:var(--dim); border:1px solid
+         transparent; border-bottom:none; border-radius:8px 8px 0 0; }
+  .tab.active { color:var(--fg); background:var(--panel);
+                border-color:var(--border); }
+  .tabpane { display:none; } .tabpane.active { display:block; }
+  .muted { color:var(--dim); font-size:12px; }
+  .addbar { display:flex; gap:8px; }
+  .addbar input { flex:1; background:#0d1117; color:var(--fg);
+    border:1px solid var(--border); border-radius:6px; padding:6px 10px;
+    font-size:13px; }
+  .toast { position:fixed; bottom:18px; right:18px; background:var(--panel);
+           border:1px solid var(--border); border-radius:8px; padding:10px 16px;
+           font-size:13px; opacity:0; transition:opacity .3s; pointer-events:none; }
+  .scrollbox { max-height:520px; overflow-y:auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ytmp-dl</h1>
+  <span class="muted" id="conn">connecting…</span>
+  <span class="muted" id="build"></span>
+  <span class="spacer"></span>
+  <button class="btn" id="btn-auth">Re-auth</button>
+</header>
+
+<main>
+  <div class="cards" id="cards"></div>
+  <div class="progress"><div id="pbar"></div></div>
+
+  <div class="panel">
+    <div class="phead">
+      <h2>Actions</h2>
+      <span class="spacer"></span>
+      <span class="muted" id="jobstate"></span>
+    </div>
+    <div class="jobline" id="jobline">idle</div>
+    <div class="filters">
+      <button class="btn primary" data-steps="discover,artists,discography,download">▶ Run All</button>
+      <button class="btn" data-steps="auth">Auth</button>
+      <button class="btn" data-steps="discover">Discover</button>
+      <button class="btn" data-steps="artists">Artists</button>
+      <button class="btn" data-steps="discography">Discography</button>
+      <button class="btn" data-steps="download">Download</button>
+      <button class="btn" data-steps="retry">Retry Failed</button>
+      <button class="btn" data-steps="remux" title="Convert downloaded .webm/.mkv files to .ogg in place">Fix .webm→.ogg</button>
+    </div>
+    <div class="filters">
+      <div class="addbar">
+        <input id="addtarget" placeholder="Add URL / playlist / artist name…">
+        <button class="btn" id="btn-add">Add</button>
+      </div>
+    </div>
+    <details id="opts-panel">
+      <summary class="muted" style="cursor:pointer;padding:8px 14px">
+        Options — what to grab</summary>
+      <div class="filters" style="border:none;padding-top:4px">
+        <label class="muted"><input type="checkbox" data-dopt="include_liked"> Liked songs</label>
+        <label class="muted"><input type="checkbox" data-dopt="include_history"> History</label>
+        <label class="muted"><input type="checkbox" data-dopt="include_library_playlists"> My playlists</label>
+        <label class="muted"><input type="checkbox" data-dopt="include_library_songs"> Library songs</label>
+        <label class="muted"><input type="checkbox" data-dopt="include_library_albums"> Library albums</label>
+        <label class="muted">Discography:
+          <select id="opt-discography-mode">
+            <option value="selected">selected artists only</option>
+            <option value="library">my library artists</option>
+            <option value="all">all artists</option>
+            <option value="off">off</option>
+          </select></label>
+        <label class="muted"><input type="checkbox" id="opt-include-discography">
+          also download discography tracks</label>
+        <span class="muted" id="sel-count"></span>
+      </div>
+    </details>
+  </div>
+
+  <div class="panel" id="account-panel">
+    <div class="phead"><h2>Account</h2><span class="spacer"></span>
+      <span class="muted" id="auth-state">checking…</span></div>
+    <div class="filters" id="auth-body" style="display:none">
+      <div style="flex:1;min-width:280px">
+        <div class="muted" style="margin-bottom:6px">
+          Sign in with the browser where you're logged into YouTube Music —
+          no cookie files needed. <b>Fully close the browser first</b>
+          (cookie DB is locked while it runs).
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="auth-browser"></select>
+          <button class="btn primary" id="btn-browser-auth">Sign in</button>
+        </div>
+        <details style="margin-top:10px">
+          <summary class="muted" style="cursor:pointer">or paste cookies.txt contents</summary>
+          <textarea id="auth-cookies" rows="4" style="width:100%;margin-top:6px;
+            background:#0d1117;color:var(--fg);border:1px solid var(--border);
+            border-radius:6px;font:11px ui-monospace,monospace"></textarea>
+          <button class="btn small" id="btn-cookie-auth" style="margin-top:6px">Save cookies</button>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="artists">Artists</div>
+    <div class="tab" data-tab="tracks">Tracks</div>
+    <div class="tab" data-tab="log">Log</div>
+  </div>
+
+  <div class="tabpane active" id="pane-artists">
+    <div class="panel"><div class="scrollbox">
+      <table><thead><tr>
+        <th style="width:28px"><input type="checkbox" id="sel-all"
+          title="select/deselect all resolved artists"></th>
+        <th>Artist</th><th>Status</th><th>Channel</th><th>Tracks</th>
+        <th>Done</th><th>Pending</th><th style="width:30%">Progress</th>
+      </tr></thead><tbody id="artists-body"></tbody></table>
+    </div></div>
+  </div>
+
+  <div class="tabpane" id="pane-tracks">
+    <div class="panel">
+      <div class="filters">
+        <select id="f-status"><option value="">all statuses</option>
+          <option>pending</option><option>done</option><option>failed</option>
+          <option>skipped</option></select>
+        <select id="f-artist"><option value="">all artists</option></select>
+        <input id="f-q" placeholder="search title / album…">
+        <button class="btn small" id="f-go">Apply</button>
+      </div>
+      <div class="scrollbox" style="max-height:560px">
+        <table><thead><tr>
+          <th>Title</th><th>Artist</th><th>Album</th><th>Trk</th>
+          <th>Status</th><th>File</th><th>Error</th>
+        </tr></thead><tbody id="tracks-body"></tbody></table>
+      </div>
+      <div class="filters">
+        <button class="btn small" id="pg-prev">← Prev</button>
+        <span class="muted" id="pg-info"></span>
+        <button class="btn small" id="pg-next">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabpane" id="pane-log">
+    <div class="panel"><div id="log"></div></div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let logSince = 0, logPaused = false, trackOffset = 0, TRACK_LIMIT = 200;
+const esc = s => (s??"").toString().replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.style.opacity=1;
+  setTimeout(()=>t.style.opacity=0, 2500); }
+
+async function j(url, opts){ const r = await fetch(url, opts); return r.json(); }
+
+/* ---------- status / state ---------- */
+async function refreshStatus(){
+  try {
+    const s = await j("/api/status");
+    $("#conn").textContent = "connected";
+    if (s.build) $("#build").textContent = "build " + s.build;
+    const st = s.stats||{}, job = s.job||{};
+    const cards = [
+      ["Artists", st.artists??0, ""], ["Releases", st.releases??0, ""],
+      ["Tracks", st.tracks_total??0, ""], ["Done", st.done??0, "done"],
+      ["Pending", st.pending??0, "pending"], ["Failed", st.failed??0, "failed"],
+      ["Skipped", st.skipped??0, "skipped"], ["Size", (st.done_gb??0)+" GB", ""],
+    ];
+    $("#cards").innerHTML = cards.map(([l,n,c]) =>
+      `<div class="card ${c}"><div class="num">${esc(n)}</div><div class="lbl">${l}</div></div>`).join("");
+    const tot = st.tracks_total||1, done = st.done||0;
+    $("#pbar").style.width = (100*done/tot).toFixed(1)+"%";
+    let jl = "idle";
+    if (job.running) jl = `<b>running:</b> ${esc(job.step)}` +
+      (job.queued?.length ? ` · queued: ${esc(job.queued.join(", "))}` : "");
+    else if (job.error) jl = `<span class="err">error: ${esc(job.error)}</span>`;
+    else if (job.queued?.length) jl = `queued: ${esc(job.queued.join(", "))}`;
+    $("#jobline").innerHTML = jl;
+    $("#jobstate").textContent = job.running ? "● busy" : "";
+  } catch(e){ $("#conn").textContent = "server not reachable"; }
+}
+
+/* ---------- artists tab (with discography selection) ---------- */
+async function loadArtists(){
+  const arts = await j("/api/artists");
+  if (!Array.isArray(arts)) return;
+  $("#artists-body").innerHTML = arts.map(a => {
+    const pct = a.total ? Math.round(100*a.done/a.total) : 0;
+    const st = a.status==="resolved" ? "done"
+             : a.status==="failed" ? "failed" : "pending";
+    return `<tr>
+      <td><input type="checkbox" class="sel-art" data-id="${a.id}"
+        ${a.selected?"checked":""} ${a.status!=="resolved"?"disabled":""}></td>
+      <td>${esc(a.name)}${a.library
+        ? ' <span class="muted" title="has tracks in your liked/history/playlists">•</span>'
+        : ""}</td>
+      <td><span class="badge b-${st}">${a.status}</span></td>
+      <td class="muted">${esc((a.channel||'').slice(0,12))}</td>
+      <td>${a.total}</td><td>${a.done}</td><td>${a.pending}</td>
+      <td><div class="pbar"><div style="width:${pct}%"></div></div></td></tr>`;
+  }).join("") || `<tr><td colspan="8" class="muted">no artists yet — run Discover</td></tr>`;
+}
+
+$("#artists-body").addEventListener("change", async e => {
+  const cb = e.target.closest(".sel-art");
+  if (!cb) return;
+  const r = await j("/api/artists/select", {method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({id: cb.dataset.id, selected: cb.checked})});
+  if (r.ok) $("#sel-count").textContent = r.selected + " artists selected";
+});
+$("#sel-all").addEventListener("change", async e => {
+  const boxes = [...document.querySelectorAll(".sel-art:not(:disabled)")];
+  const ids = boxes.map(cb => +cb.dataset.id);
+  boxes.forEach(cb => cb.checked = e.target.checked);
+  const r = await j("/api/artists/select", {method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ids, selected: e.target.checked})});
+  if (r.ok) $("#sel-count").textContent = r.selected + " artists selected";
+});
+
+/* ---------- options ---------- */
+async function loadSettings(){
+  const s = await j("/api/settings");
+  if (s.error || !s.discover) return;
+  document.querySelectorAll("[data-dopt]").forEach(cb => {
+    cb.checked = !!s.discover[cb.dataset.dopt];
+  });
+  $("#opt-discography-mode").value = s.discography?.mode || "selected";
+  $("#opt-include-discography").checked = !!s.download?.include_discography;
+  $("#sel-count").textContent = (s.selected_artists||0) + " artists selected";
+}
+async function saveSettings(){
+  const discover = {};
+  document.querySelectorAll("[data-dopt]").forEach(cb =>
+    discover[cb.dataset.dopt] = cb.checked);
+  await j("/api/settings", {method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      discover,
+      discography: {mode: $("#opt-discography-mode").value},
+      download: {include_discography: $("#opt-include-discography").checked},
+    })});
+  toast("options saved");
+}
+document.querySelectorAll("[data-dopt],#opt-discography-mode,#opt-include-discography")
+  .forEach(el => el.addEventListener("change", saveSettings));
+
+/* ---------- tracks ---------- */
+async function loadArtistFilter(){
+  const arts = await j("/api/artists");
+  if (!Array.isArray(arts)) return;
+  const sel = $("#f-artist");
+  const cur = sel.value;
+  sel.innerHTML = `<option value="">all artists</option>` +
+    arts.map(a=>`<option value="${esc(a.key||'')}">${esc(a.name)}</option>`).join("");
+  sel.value = cur;
+}
+async function refreshTracks(){
+  const p = new URLSearchParams({limit:TRACK_LIMIT, offset:trackOffset});
+  const st=$("#f-status").value, ar=$("#f-artist").value, q=$("#f-q").value.trim();
+  if(st) p.set("status",st); if(ar) p.set("artist",ar.toLowerCase()); if(q) p.set("q",q);
+  const d = await j("/api/tracks?"+p);
+  if (d.error) { $("#tracks-body").innerHTML =
+    `<tr><td colspan="7" class="err">${esc(d.error)}</td></tr>`; return; }
+  $("#tracks-body").innerHTML = (d.rows||[]).map(t =>
+    `<tr><td title="${esc(t.video_id)}">${esc(t.title)}</td>
+     <td class="muted">${esc((t.artist_names||[]).join(", "))}</td>
+     <td>${esc(t.mb_album||t.album||"")}${t.mb_track_number?` <span class="muted">#${t.mb_track_number}</span>`:""}</td>
+     <td><span class="badge b-${t.status}">${t.status}</span></td>
+     <td class="muted" title="${esc(t.file_path||'')}">${esc((t.file_path||'').split('/').slice(-2).join('/'))}</td>
+     <td class="muted" title="${esc(t.error||'')}">${esc((t.error||'').slice(0,40))}</td></tr>`).join("")
+    || `<tr><td colspan="7" class="muted">no tracks</td></tr>`;
+  const maxOff = Math.max(0, (d.total||0)-TRACK_LIMIT);
+  $("#pg-info").textContent = `${trackOffset+1}–${Math.min(trackOffset+TRACK_LIMIT,d.total||0)} of ${d.total||0}`;
+  $("#pg-prev").disabled = trackOffset<=0; $("#pg-next").disabled = trackOffset>=maxOff;
+}
+
+/* ---------- logs ---------- */
+async function refreshLogs(){
+  if (logPaused) return;
+  const d = await j("/api/logs?since="+logSince);
+  if (!d.lines?.length) { logSince = d.next||logSince; return; }
+  const el = $("#log");
+  const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+  for (const [n, lvl, msg] of d.lines){
+    const cls = lvl==="WARNING"?"ln-warn":lvl==="ERROR"?"ln-err":lvl==="DEBUG"?"ln-dbg":"";
+    el.insertAdjacentHTML("beforeend",
+      `<div class="${cls}">${esc(msg)}</div>`);
+  }
+  logSince = d.next;
+  while (el.children.length > 3000) el.removeChild(el.firstChild);
+  if (nearBottom) el.scrollTop = el.scrollHeight;
+}
+
+/* ---------- auth ---------- */
+async function refreshAuth(){
+  const s = await j("/api/auth/status");
+  const el = $("#auth-state"), body = $("#auth-body");
+  if (s.account){ el.innerHTML = `signed in: <b>${esc(s.account)}</b>`;
+    body.style.display = "none"; }
+  else if (s.cookies_file || s.auth_json){ el.textContent = "session may be expired — re-auth";
+    body.style.display = "flex"; }
+  else { el.textContent = "not signed in"; body.style.display = "flex"; }
+  if (s.error) el.innerHTML += ` <span class="err">(${esc(s.error)})</span>`;
+}
+async function loadBrowsers(){
+  const b = await j("/api/auth/browsers");
+  const sel = $("#auth-browser");
+  if (Array.isArray(b) && b.length){
+    sel.innerHTML = b.map(x =>
+      `<option value="${esc(x.browser)}|${esc(x.profile)}">${esc(x.label||x.browser)}</option>`).join("");
+  } else {
+    sel.innerHTML = `<option value="">no browsers detected</option>`;
+  }
+}
+$("#btn-browser-auth").addEventListener("click", async () => {
+  const [browser, profile] = ($("#auth-browser").value||"|").split("|");
+  if(!browser){ toast("no browser selected"); return; }
+  toast("reading browser cookies…");
+  const r = await j("/api/auth/browser", {method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({browser, profile})});
+  if (r.ok){ toast("signed in as "+r.account); refreshAuth(); }
+  else toast("auth failed: "+(r.error||"?"));
+});
+$("#btn-cookie-auth").addEventListener("click", async () => {
+  const text = $("#auth-cookies").value;
+  const r = await j("/api/auth/cookies", {method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({text})});
+  if (r.ok){ toast("signed in as "+r.account); refreshAuth(); }
+  else toast("auth failed: "+(r.error||"?"));
+});
+
+/* ---------- actions ---------- */
+document.querySelectorAll("[data-steps]").forEach(b =>
+  b.addEventListener("click", async () => {
+    const steps = b.dataset.steps.split(",");
+    await j("/api/run", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({steps})});
+    toast("queued: " + steps.join(", "));
+  }));
+$("#btn-add").addEventListener("click", async () => {
+  const t = $("#addtarget").value.trim(); if(!t) return;
+  await j("/api/add", {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({target:t})});
+  $("#addtarget").value=""; toast("added: "+t.slice(0,50));
+});
+$("#btn-auth").addEventListener("click", async () => {
+  await j("/api/reconnect", {method:"POST"}); toast("re-authenticating…");
+});
+$("#f-go").addEventListener("click", () => { trackOffset=0; refreshTracks(); });
+$("#f-q").addEventListener("keydown", e => { if(e.key==="Enter"){trackOffset=0;refreshTracks();} });
+$("#pg-prev").addEventListener("click", () => { trackOffset=Math.max(0,trackOffset-TRACK_LIMIT); refreshTracks(); });
+$("#pg-next").addEventListener("click", () => { trackOffset+=TRACK_LIMIT; refreshTracks(); });
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".tabpane").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active"); $("#pane-"+t.dataset.tab).classList.add("active");
+  if (t.dataset.tab==="tracks") refreshTracks();
+}));
+
+loadArtistFilter(); loadArtists(); loadSettings(); loadBrowsers();
+refreshTracks(); refreshStatus(); refreshLogs(); refreshAuth();
+setInterval(refreshStatus, 2000);
+setInterval(refreshAuth, 10000);
+setInterval(refreshLogs, 1500);
+setInterval(() => {
+  if ($("#pane-artists").classList.contains("active")) loadArtists();
+  if ($("#pane-tracks").classList.contains("active")) refreshTracks();
+}, 5000);
+</script>
+</body>
+</html>

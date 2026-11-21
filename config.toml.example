@@ -1,0 +1,55 @@
+# ytmp-dl configuration — copy to config.toml and adjust.
+
+[general]
+output_dir = "./music"        # Plex library source folder (Artist/Album/NN - Title)
+state_db = "./ytmp_dl.db"     # sqlite state (resume-safe)
+cookies_file = "./cookies.txt"# Netscape cookies.txt export from your browser
+cache_dir = "./cache"         # MB API cache, artwork cache, download staging
+
+[discover]
+include_liked = true          # "Liked Music" playlist
+include_history = true        # YouTube Music play history
+include_library_playlists = true
+include_library_songs = false # songs saved to library (not in playlists)
+include_library_albums = false
+# auto-generated mixes are skipped by default; edit as needed
+skip_playlist_patterns = [
+  "mix", "discover", "release radar", "repeat rewind", "your mix",
+  "on repeat", "new releases", "daily drive", "deeper dive", "revisit",
+]
+manual_playlists = []         # playlist IDs or URLs to always include
+manual_artists = []           # artist names to force full-discography
+
+[discography]
+# what the Discography step expands (GUI Options overrides this):
+#   selected = only artists ticked in the GUI Artists tab (default)
+#   library  = artists that appear in your liked/history/playlist tracks
+#   all      = every resolved artist (full discographies, can be huge)
+#   off      = don't expand discographies at all
+mode = "selected"
+
+[download]
+format = "bestaudio/best"     # yt-dlp selector; bestaudio = highest-quality audio-only
+workers = 2                   # parallel downloads (1 = sequential, safest)
+sleep_requests = 0.5          # seconds between HTTP requests inside yt-dlp
+sleep_interval = 0.2          # seconds between tracks
+max_retries = 3               # attempts before a track is marked failed
+concurrent_fragments = 4
+include_discography = false    # also download album:/songs bulk tracks
+
+[metadata]
+musicbrainz = true            # canonical tags: album/track#/disc/date/ISRC/art
+spotify = true                # fallback metadata (needs keys below)
+match_threshold = 0.72        # fuzzy match acceptance score 0..1
+mb_rate_interval = 1.1        # seconds between MusicBrainz requests (their limit ~1/s)
+
+[spotify]
+# optional: free app at https://developer.spotify.com/dashboard
+client_id = ""
+client_secret = ""
+
+[artwork]
+size = "500"                  # coverartarchive size (250/500/1200)
+
+[gui]
+token = ""                  # set a secret to expose the UI beyond localhost
