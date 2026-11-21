@@ -1,10 +1,16 @@
-# ytmp-dl
+<p align="center">
+  <img src="logo.svg" width="120" alt="ytmp-dl logo">
+</p>
 
-Archive your YouTube Music library into a tagged, Plex/PlexAmp-ready music
-tree. Reads your liked songs, history, and playlists; optionally expands
-artists to their full discographies; downloads the best audio YouTube
-serves; then tags everything with canonical MusicBrainz metadata (Spotify
-fallback) — album, track/disc numbers, date, ISRC, genre, cover art.
+<h1 align="center">ytmp-dl</h1>
+
+<p align="center">
+  Archive your YouTube Music library into a tagged, Plex/PlexAmp-ready music
+  tree. Reads your liked songs, history, and playlists; optionally expands
+  artists to their full discographies; downloads the best audio YouTube
+  serves; then tags everything with canonical MusicBrainz metadata (Spotify
+  fallback) — album, track/disc numbers, date, ISRC, genre, cover art.
+</p>
 
 ```
 music/

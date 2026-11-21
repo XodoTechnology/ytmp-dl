@@ -210,6 +210,10 @@ def create_app(root: Path | None = None) -> Flask:
     def index():
         return send_from_directory(STATIC, "index.html")
 
+    @app.get("/logo.svg")
+    def logo():
+        return send_from_directory(STATIC, "logo.svg")
+
     # ---------------- state / status ----------------
     @app.get("/api/state")
     def api_state():
