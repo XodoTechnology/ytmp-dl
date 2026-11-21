@@ -1,153 +1,203 @@
 # ytmp-dl
 
-Archive your YouTube Music library into a Plex/PlexAmp-ready music tree.
-
-Reads your liked songs, playlists, and play history; expands every artist to
-their full discography; downloads the highest-quality audio YouTube serves;
-then tags everything with canonical MusicBrainz metadata (Spotify fallback)
-including album, track/disc numbers, date, ISRC, and cover art.
+Archive your YouTube Music library into a tagged, Plex/PlexAmp-ready music
+tree. Reads your liked songs, history, and playlists; optionally expands
+artists to their full discographies; downloads the best audio YouTube
+serves; then tags everything with canonical MusicBrainz metadata (Spotify
+fallback) — album, track/disc numbers, date, ISRC, genre, cover art.
 
 ```
 music/
   Artist Name/
     Album Title (Year)/
-      01 - Track Title.ogg        # or .m4a/.webm/.opus — best source kept
       cover.jpg
+      01 - Track Title.ogg        # opus/vorbis remuxed from webm, or .m4a/.mp3/.flac
+      02 - Track Title.ogg
 ```
+
+## Features
+
+- **Browser sign-in, no cookie exports** — pulls your YouTube session
+  straight from Chrome, Edge, Firefox, Brave, Opera, or Opera GX. Paste a
+  `cookies.txt` or JSON cookie export as a fallback.
+- **Local web GUI** — stat cards, live progress, job queue, artist/track
+  tables, live log console. Binds to localhost only.
+- **Selective discovery** — pick exactly what to grab: liked songs, play
+  history, your playlists, library songs/albums. Auto-generated mixes
+  ("Discover", "Repeat Rewind", …) are skipped by default.
+- **Discography on demand** — expand only the artists *you* tick, or all
+  library artists, or everything — never silently queues 100k tracks.
+- **Best-quality audio** — `yt-dlp` `bestaudio/best`: Opus ~130 kbps in
+  WebM, remuxed losslessly to `.ogg` (codec copy, no re-encode). m4a/MP3
+  sources are kept as-is. ffmpeg is bundled by the Windows build.
+- **Canonical tags** — MusicBrainz matching per track (title + duration +
+  album tiebreak), Spotify fallback. ISRC, release dates, disc numbers,
+  embedded artwork, plus `cover.jpg` per album folder.
+- **Resumable** — everything lives in SQLite (WAL). Interrupts, crashes,
+  and re-runs pick up where they left off. Done tracks are never fetched
+  twice; duplicate recordings across YouTube uploads are deduped by
+  MusicBrainz recording ID.
+- **Cookie-resilient downloads** — yt-dlp tries *without* cookies first
+  and only uses your session as a fallback, so downloads keep working
+  after the cookies expire.
 
 ## Requirements
 
-- Python 3.10+
-- ffmpeg / ffprobe (for Opus-in-MP4 remux and fallback tagging)
-- A modern browser (Chrome/Edge/Firefox) for cookie export
+- **Windows**: nothing — `windows\install.bat` installs Python 3.13,
+  dependencies, and ffmpeg for you, then builds a self-contained
+  `dist\ytmp-dl.exe`.
+- **Manual / Linux / macOS**: Python 3.10+, `ffmpeg`/`ffprobe` on PATH
+  (or in `bin/` next to the project), and a modern browser for sign-in.
 
-## Setup
+## Windows — one-click install
+
+1. Download and extract the source zip somewhere, e.g. `C:\ytmp-dl`.
+2. Double-click **`windows\install.bat`**. It will:
+   - silently install Python 3.13 if missing (no clicks),
+   - create a venv and install dependencies,
+   - download ffmpeg (~80 MB, one time),
+   - build `dist\ytmp-dl.exe` with PyInstaller,
+   - copy ffmpeg into `dist\bin\` next to the exe,
+   - create a **ytmp-dl** desktop shortcut and launch the GUI.
+3. In the GUI's **Account** panel click **Sign in** and pick the browser
+   you're logged into YouTube Music in. Fully close that browser first —
+   its cookie database is locked while running.
+4. Use **Options** to choose what to grab, tick artists for discography
+   expansion if wanted, then hit **Run All** or **Download**.
+5. Point your Plex music library at `dist\music\`.
+
+To rebuild after pulling updates: `windows\build.bat` (venv + ffmpeg are
+reused — only the PyInstaller step re-runs, ~2 min).
+
+## Manual install
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-cp config.toml.example config.toml   # then edit as needed
+cp config.toml.example config.toml    # optional — GUI Options override it
+.venv/bin/python -m ytmp_dl gui       # opens http://127.0.0.1:8377
 ```
 
-A standalone `yt-dlp` binary is also supported — place `yt-dlp` on PATH or set
-`YTDLP` in `config.toml` (defaults to `yt-dlp`).
+Or build the Windows exe yourself:
 
-## Cookies (required for your library)
-
-YouTube Music has no public API for personal libraries, so the tool uses your
-browser session cookies.
-
-1. Install a cookies export extension, e.g.
-   **"Get cookies.txt LOCALLY"** (Chrome/Firefox).
-2. While logged in to YouTube Music in that browser, open
-   `music.youtube.com` and export **all cookies for the site** as
-   `cookies.txt` (Netscape format).
-3. Save it as `cookies.txt` in this directory (gitignored).
-
-> Your cookies are secrets — never commit or share `cookies.txt` or
-> `auth.json`. Treat them like a password.
-
-Then validate:
-
-```bash
-.venv/bin/python -m ytmp_dl auth
+```bat
+windows\build.bat    :: produces dist\ytmp-dl.exe + dist\bin\ffmpeg*
 ```
 
-## Windows (one-click install)
+## Authentication
 
-On the Windows machine (the one running Plex):
+YouTube Music has no public API for personal libraries, so the tool uses
+your browser session.
 
-1. Download + extract the source zip, e.g. to `C:\ytmp-dl`.
-2. Double-click `windows\install.bat` — it silently installs Python if
-   needed, installs dependencies, downloads ffmpeg, builds
-   `dist\ytmp-dl.exe`, drops a **ytmp-dl** shortcut on your Desktop, and
-   launches the GUI.
-3. In the GUI's **Account** panel click **Sign in** — it reads cookies
-   directly from your installed browser (Chrome/Edge/Firefox/Brave…),
-   no cookie export needed. Paste-cookies fallback included.
-4. Hit **Run All**. Music lands in `dist\music\Artist\Album (Year)\` —
-   point your Plex music library there.
+- **Sign in (recommended)** — GUI → Account → pick your browser →
+  **Sign in**. Cookies are read directly from the browser profile and
+  validated against YouTube Music.
+- **Paste cookies** — export all cookies for `music.youtube.com` (Netscape
+  `cookies.txt` *or* a JSON cookie export) and paste into the Account
+  panel.
+- **cookies.txt file** — drop a Netscape export at `./cookies.txt`
+  (gitignored) and the pipeline picks it up automatically.
 
-`ytmp-dl.exe` with no arguments launches the GUI; CLI subcommands work
-too (`ytmp-dl.exe discover`, `ytmp-dl.exe download`, …).
+> Cookies are secrets — treat them like a password. `cookies.txt`,
+> `*.auth.json`, `config.toml`, the database, and `music/` are all
+> gitignored and never leave your machine.
 
 ## GUI
 
-```bash
-.venv/bin/python -m ytmp_dl gui          # or: ./ytmp-dl gui
-# Windows exe: ytmp-dl.exe gui
-```
+`http://127.0.0.1:8377` — everything runs as queued background jobs so
+the UI stays responsive.
 
-Opens a local web UI at `http://127.0.0.1:8377` (binds localhost only):
+- **Actions** — Run All, Auth, Discover, Artists, Discography, Download,
+  Retry Failed, Fix .webm→.ogg, plus an "add URL / playlist / artist" box.
+- **Options — what to grab** — toggles for liked songs, history,
+  playlists, library songs/albums; a discography mode selector
+  (`selected artists only` / `my library artists` / `all artists` /
+  `off`); and "also download discography tracks". Persisted in the DB.
+- **Artists tab** — every artist with status, progress bar, and a
+  checkbox to include it in discography expansion (`•` = appears in your
+  library). Header checkbox selects all.
+- **Tracks tab** — every song with status badges, filters
+  (status/artist/search), pagination, file paths, errors.
+- **Log tab** — live pipeline log; auth and download errors show here.
 
-- stat cards + progress bar (done/pending/failed/skipped, size on disk)
-- one-click pipeline steps: Auth, Discover, Artists, Discography,
-  Download, Retry Failed, or Run All — jobs queue and run sequentially
-- add arbitrary URLs / playlists / artist names
-- Artists tab with per-artist progress, Tracks tab with filters
-  (status / artist / search) and pagination, live Log console
-- "Re-auth" re-reads `cookies.txt` without restarting
-
-## Usage
-
-The pipeline is phased so short-lived cookies only matter up front:
-
-1. **Discovery** (`auth`, `discover`, `artists`, `discography`) — talks to
-   YouTube Music, needs fresh cookies. Everything is stored in `ytmp_dl.db`.
-2. **Download** (`download`) — reads only the DB + MusicBrainz. yt-dlp tries
-   *without* cookies first and only falls back to `cookies.txt` if needed,
-   so downloads keep working after your cookies expire.
+## CLI
 
 ```bash
-# one-shot: auth check → discover library → resolve artists → expand
-# discographies → download everything (resumable, safe to re-run)
-.venv/bin/python -m ytmp_dl all
-
-# or step by step — run discovery while cookies are fresh, download anytime
-.venv/bin/python -m ytmp_dl discover    # liked songs, history, playlists
-.venv/bin/python -m ytmp_dl artists     # resolve artist names → YTM channels
-.venv/bin/python -m ytmp_dl discography # fetch every album/single + tracklist
-.venv/bin/python -m ytmp_dl download    # download + tag (workers in config)
-.venv/bin/python -m ytmp_dl status      # progress summary
-.venv/bin/python -m ytmp_dl retry       # re-attempt failed tracks
-
-# cookies expired? re-export cookies.txt, then re-run discovery — it
-# upserts into the same DB, then continue downloading
-.venv/bin/python -m ytmp_dl auth && .venv/bin/python -m ytmp_dl discover
-
-# add content ad-hoc
-.venv/bin/python -m ytmp_dl add "https://music.youtube.com/watch?v=..."
-.venv/bin/python -m ytmp_dl add --artist "Boards of Canada"
+ytmp-dl discover      # liked songs, history, playlists -> DB
+ytmp-dl artists       # resolve artist names -> YTM channels
+ytmp-dl discography   # expand artists per the selected mode
+ytmp-dl download      # download + tag pending tracks (--limit/--artist/--workers)
+ytmp-dl remux         # re-box .webm/.mkv -> .ogg in place + retag
+ytmp-dl retry         # reset failed tracks to pending
+ytmp-dl status        # progress summary
+ytmp-dl add <url|playlist|artist>   # ad-hoc additions
+ytmp-dl auth          # build + validate auth from cookies.txt
+ytmp-dl gui           # launch the web UI
 ```
-
-No cookies? You can still test with public artists — the `add --artist` path
-works unauthenticated for anything YouTube Music exposes publicly.
 
 ## How it works
 
-- **Discovery** — `ytmusicapi` reads Liked Music (`LM`), history, and library
-  playlists; artist "songs/albums" shelves are expanded through YouTube
-  Music's continuation API to get complete discographies.
-- **Download** — `yt-dlp` fetches `bestaudio/best`: typically Opus ~130 kbps
-  (webm/opus) or AAC ~130 kbps (m4a). Premium-only streams aren't accessible
-  without Premium, so this is the best free source.
-- **Metadata** — MusicBrainz is queried per artist; every YouTube track is
-  fuzzy-matched to a canonical release recording by title + duration, with
-  the YouTube album name breaking ties. Spotify is used only when
-  MusicBrainz can't match (needs free API keys in `config.toml`).
-- **Dedup** — the same song appearing under multiple YouTube videos (album
-  upload vs. single upload vs. topic channel) is downloaded once, keyed on
-  the MusicBrainz recording ID.
-- **State** — everything is tracked in `ytmp_dl.db` (SQLite, WAL mode).
-  Interrupts, retries, and re-runs resume where they left off; nothing is
-  downloaded twice.
+- **Discovery** — `ytmusicapi` reads Liked Music, history, and library
+  playlists; raw-response fallbacks handle YouTube's changing page
+  layouts. Everything upserts into `ytmp_dl.db` immediately, so cookie
+  expiry can't interrupt a later download run.
+- **Artists** — channel IDs are resolved from track credits or YouTube
+  Music search; a raw-page parser covers channel layouts
+  `ytmusicapi` doesn't understand yet.
+- **Discography** — per-artist album/single/EP shelves plus the "songs"
+  tab are expanded into release + track rows.
+- **Matching** — lazy, per-track, inside the download workers:
+  MusicBrainz recording search → fuzzy title/duration/album scoring →
+  Spotify fallback → YouTube Music metadata as last resort. MB failures
+  degrade to fallback tags instead of killing the job.
+- **Download** — `yt-dlp` `bestaudio/best`, public-first with cookie
+  fallback. WebM Opus/Vorbis is remuxed to `.ogg` via `ffmpeg -c copy`
+  (lossless); other containers pass through.
+- **Tagging** — mutagen writes Vorbis comments (ogg/opus), MP4 atoms
+  (m4a), ID3 (mp3), or best-effort WebM tags, plus embedded artwork.
+- **State** — SQLite WAL + busy-retry; safe for concurrent GUI/API
+  access and duplicate exe instances degrade gracefully.
+
+## Config
+
+`config.toml` (see `config.toml.example`) — everything also settable from
+the GUI Options panel, which stores overrides in the DB:
+
+| section | key | default | meaning |
+|---|---|---|---|
+| discover | include_liked / include_history / include_library_playlists | true | library sources |
+| discover | include_library_songs / include_library_albums | false | extra library sources |
+| discography | mode | `selected` | selected / library / all / off |
+| download | include_discography | false | also fetch album:/songs bulk |
+| download | workers | 2 | parallel downloads |
+| metadata | musicbrainz / spotify | true | metadata providers |
+| spotify | client_id / client_secret | "" | optional fallback keys |
+
+## Troubleshooting
+
+- **"ffmpeg/ffprobe not found"** — put `ffmpeg.exe` + `ffprobe.exe` in
+  `dist\bin\` (next to the exe), in `bin\` at the project root, or on
+  PATH, then rebuild/restart. The Windows installer does this for you.
+- **`.webm` files in `music\`** — remux didn't run (ffmpeg missing at
+  download time). Fix ffmpeg, then run **Fix .webm→.ogg** (or
+  `ytmp-dl remux`) to convert existing files in place.
+- **Sign-in fails / browser option missing** — fully quit the browser
+  (Opera GX lives in the system tray), retry. Opera GX maps to yt-dlp's
+  `opera` extractor with its profile path passed explicitly.
+- **`database is locked`** — another `ytmp-dl.exe` is running; check Task
+  Manager and end extras. The DB retries for 30 s before erroring.
+- **Artist resolve warnings** (`musicImmersiveHeaderRenderer`) — YouTube
+  layout drift; the raw-page fallback handles it and failed artists
+  auto-retry on the next Artists run.
+- **Match failures** — transient MusicBrainz errors now log a warning
+  and fall back to YouTube metadata; the track still downloads.
 
 ## Notes
 
-- Downloads are the best *free* audio YouTube exposes (~128–160 kbps Opus or
-  AAC). With YouTube Premium, higher-bitrate formats may appear and will be
-  picked up automatically by the same `bestaudio/best` selector.
-- Live recordings, remixes, and deluxe-edition pressings in your library are
-  kept as their own albums — that's intentional.
-- This tool is for archiving content you have the right to download. Respect
-  YouTube's Terms of Service and artists' rights.
+- Downloads are the best *free* audio YouTube exposes (~128–160 kbps
+  Opus/AAC). Premium-only higher-bitrate formats aren't accessible
+  without Premium; if they appear later, `bestaudio/best` picks them up.
+- Live recordings, remixes, and deluxe pressings stay as their own
+  albums — intentional.
+- This tool is for archiving content you have the right to download.
+  Respect YouTube's Terms of Service and artists' rights.
